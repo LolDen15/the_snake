@@ -26,11 +26,17 @@ BORDER_COLOR = (93, 216, 228)
 # Цвет яблока
 APPLE_COLOR = (255, 0, 0)
 
+# Цвет банана
+BANANA_COLOR = (255, 255, 0)
+
+# Цвет банана
+ROCK_COLOR = (128, 128, 128)
+
 # Цвет змейки
 SNAKE_COLOR = (0, 255, 0)
 
 # Скорость движения змейки:
-SPEED = 19
+SPEED = 8
 
 # Настройка игрового окна:
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), 0, 32)
@@ -57,8 +63,8 @@ class GameObject:
 
 
 class Apple(GameObject):
-    def __init__(self):
-        super().__init__(body_color=APPLE_COLOR)
+    def __init__(self, body_color=APPLE_COLOR):
+        super().__init__(body_color)
         self.randomize_position()
         self.position = self.randomize_position()
 
@@ -77,16 +83,26 @@ class Apple(GameObject):
         pygame.draw.rect(surface, BORDER_COLOR, rect, 1)
 
 
+class Banana(Apple):
+    def __init__(self):
+        super().__init__(body_color=BANANA_COLOR)
+
+
+class Rock(Apple):
+    def __init__(self):
+        super().__init__(body_color=ROCK_COLOR)
+
+
 class Snake(GameObject):
 
     def __init__(self):
         super().__init__(body_color=SNAKE_COLOR)
         self.length: int = 1
-        self.reset()
         self.last: Optional[tuple] = None
         self.next_direction: Optional[tuple] = None
         self.direction = RIGHT
         self.positions = [self.position]
+        self.reset()
 
     def update_direction(self):
         if self.next_direction:
@@ -134,7 +150,8 @@ class Snake(GameObject):
 
     def reset(self):
         self.length = 1
-        self.positions = [self.position]
+        if len(self.positions) > 1:
+            del self.positions[1:]
 
 
 def handle_keys(game_object):
@@ -157,18 +174,29 @@ def main():
     # Тут нужно создать экземпляры классов.
     apple = Apple()
     snake = Snake()
-
+    banana = Banana()
+    rock = Rock()
     while True:
         handle_keys(snake)
         clock.tick(SPEED)
         screen.fill(BOARD_BACKGROUND_COLOR)
         apple.draw(screen)
+        banana.draw(screen)
+        rock.draw(screen)
         snake.draw(screen)
         snake.update_direction()
         snake.move()
         if snake.get_head_position() == apple.position:
             snake.length += 1
             apple.position = apple.randomize_position()
+        if snake.get_head_position() == rock.position:
+            rock.position = rock.randomize_position()
+            snake.reset()
+        if snake.get_head_position() == banana.position:
+            banana.position = banana.randomize_position()
+            if len(snake.positions) > 1:
+                snake.length -= 1
+                snake.last = snake.positions.pop()
 
         pygame.display.update()
         # Тут опишите основную логику игры.
