@@ -111,7 +111,7 @@ class Snake(GameObject):
     """Класс представляет змейку, которой управляет игрок."""
 
     def __init__(self):
-        """Инициализация атрибутов класса Банана."""
+        """Инициализация атрибутов класса Змейки."""
         super().__init__(body_color=SNAKE_COLOR)
         self.length: int = 1
         self.last: Optional[tuple] = None
