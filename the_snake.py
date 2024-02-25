@@ -18,6 +18,17 @@ DOWN = (0, 1)
 LEFT = (-1, 0)
 RIGHT = (1, 0)
 
+CONTROL_DICT = {
+    (LEFT, pg.K_UP): UP,
+    (RIGHT, pg.K_UP): UP,
+    (LEFT, pg.K_DOWN): DOWN,
+    (RIGHT, pg.K_DOWN): DOWN,
+    (UP, pg.K_LEFT): LEFT,
+    (DOWN, pg.K_LEFT): LEFT,
+    (UP, pg.K_RIGHT): RIGHT,
+    (DOWN, pg.K_RIGHT): RIGHT
+}
+
 # Цвет фона - черный:
 BOARD_BACKGROUND_COLOR = (0, 0, 0)
 
@@ -66,9 +77,12 @@ class GameObject:
             'Это абстрактный метод для переопределения в дочерних классах'
         )
 
-    def generate_rect(self, surface, color, rect, width=0):
+    def generate_rect(self, surface, position, color):
         """Метод для получения размера одной ячейки"""
-        return pg.draw.rect(surface, color, rect, width)
+        rect = pg.Rect((position[0], position[1]), (GRID_SIZE, GRID_SIZE))
+        pg.draw.rect(surface, color, rect)
+        if color != BOARD_BACKGROUND_COLOR:
+            pg.draw.rect(surface, BORDER_COLOR, rect, 1)
 
 
 class Food(GameObject):
@@ -81,22 +95,17 @@ class Food(GameObject):
 
     def randomize_position(self, positions):
         """Метод для получения случайной позиции объекта."""
-        x: float = randint(0, SCREEN_WIDTH // GRID_SIZE - 1) * GRID_SIZE
-        y: float = randint(1, SCREEN_HEIGHT // GRID_SIZE - 1) * GRID_SIZE
-        self.position: tuple = x, y
-        while positions and self.position in positions:
-            x: float = randint(0, SCREEN_WIDTH // GRID_SIZE - 1) * GRID_SIZE
-            y: float = randint(1, SCREEN_HEIGHT // GRID_SIZE - 1) * GRID_SIZE
-            self.position: tuple = x, y
+        while True:
+            if positions and self.position in positions:
+                xy = (randint(0, SCREEN_WIDTH // GRID_SIZE - 1) * GRID_SIZE,
+                      randint(1, SCREEN_HEIGHT // GRID_SIZE - 1) * GRID_SIZE)
+                self.position: tuple = xy
+            else:
+                break
 
     def draw(self, surface):
         """Метод для отрисовки объекта."""
-        rect = pg.Rect(
-            (self.position[0], self.position[1]),
-            (GRID_SIZE, GRID_SIZE)
-        )
-        self.generate_rect(surface, self.body_color, rect)
-        self.generate_rect(surface, BORDER_COLOR, rect, 1)
+        self.generate_rect(surface, self.position, color=self.body_color)
 
 
 class Apple(Food):
@@ -130,14 +139,13 @@ class Snake(GameObject):
         super().__init__(body_color=SNAKE_COLOR)
         self.reset()
 
-    def update_direction(self):
+    def update_direction(self, new_direction=None):
         """
         Метод для обновления направления
         после нажатия на направляющую кнопку.
         """
-        if self.next_direction:
-            self.direction: tuple = self.next_direction
-            self.next_direction = None
+        if new_direction:
+            self.direction: tuple = new_direction
 
     def move(self):
         """Метод для перемещения объекта по игровому полю."""
@@ -150,26 +158,23 @@ class Snake(GameObject):
 
         if new_head_position in self.positions[2:]:
             self.reset()
-        self.positions.insert(0, new_head_position)
-
-        if len(self.positions) > self.length:
-            self.last = self.positions.pop()
+            screen.fill(BOARD_BACKGROUND_COLOR)
+        else:
+            self.positions.insert(0, new_head_position)
+            if len(self.positions) > self.length:
+                self.last = self.positions.pop()
 
     def draw(self, surface):
         """Метод для отрисовки объекта."""
-        head_rect = pg.Rect(self.positions[0], (GRID_SIZE, GRID_SIZE))
-        # pg.draw.rect(surface, self.body_color, head_rect)
-        self.generate_rect(surface, self.body_color, head_rect)
-        # pg.draw.rect(surface, BORDER_COLOR, head_rect, 1)
-        self.generate_rect(surface, BORDER_COLOR, head_rect, 1)
+        for position in self.positions:
+            self.generate_rect(surface, position, self.body_color)
 
         if self.last:
             last_rect = pg.Rect(
                 (self.last[0], self.last[1]),
                 (GRID_SIZE, GRID_SIZE)
             )
-            # pg.draw.rect(surface, BOARD_BACKGROUND_COLOR, last_rect)
-            self.generate_rect(surface, BOARD_BACKGROUND_COLOR, last_rect)
+            self.generate_rect(surface, last_rect, BOARD_BACKGROUND_COLOR)
 
     def get_head_position(self):
         """Метод для получения позиции головы земейки."""
@@ -182,9 +187,8 @@ class Snake(GameObject):
         self.next_direction: Optional[tuple] = None
         self.direction = RIGHT
         self.positions = [self.position]
-        screen.fill(BOARD_BACKGROUND_COLOR)
-        if len(self.positions) > 1:
-            del self.positions[1:]
+        # if len(self.positions) > 1:
+        #     del self.positions[1:]
 
 
 def handle_keys(game_object):
@@ -194,17 +198,13 @@ def handle_keys(game_object):
             pg.quit()
             raise SystemExit
         elif event.type == pg.KEYDOWN:
-            if event.key == pg.K_UP and game_object.direction != DOWN:
-                game_object.next_direction = UP
-            elif event.key == pg.K_DOWN and game_object.direction != UP:
-                game_object.next_direction = DOWN
-            elif event.key == pg.K_LEFT and game_object.direction != RIGHT:
-                game_object.next_direction = LEFT
-            elif event.key == pg.K_RIGHT and game_object.direction != LEFT:
-                game_object.next_direction = RIGHT
-            elif event.key == pg.K_ESCAPE:
+            if event.key == pg.K_ESCAPE:
                 pg.quit()
                 raise SystemExit
+            return CONTROL_DICT.get(
+                (game_object.direction, event.key),
+                game_object.direction
+            )
 
 
 def main():
@@ -215,9 +215,9 @@ def main():
     rock = Rock()
     while True:
         clock.tick(SPEED)
-        handle_keys(snake)
-        snake.update_direction()
-        snake.move()
+        screen.fill(BOARD_BACKGROUND_COLOR)
+        snake.update_direction(handle_keys(snake))
+
         if snake.get_head_position() == apple.position:
             snake.length += 1
             apple.randomize_position(snake.positions)
@@ -229,10 +229,11 @@ def main():
             if len(snake.positions) > 1:
                 snake.length -= 1
                 snake.last = snake.positions.pop()
-                screen.fill(BOARD_BACKGROUND_COLOR)
             elif len(snake.positions) == 1:
                 snake.reset()
+
         snake.draw(screen)
+        snake.move()
         apple.draw(screen)
         banana.draw(screen)
         rock.draw(screen)
